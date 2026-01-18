@@ -3,11 +3,13 @@
  * Run with: npm run db:migrate:parental
  */
 
-import { getDb } from '../src/lib/db';
+import { getDb, ensureDb } from '../src/lib/db';
 
 async function migrate() {
   console.log('Running parental guide migration...\n');
 
+  // Ensure database is initialized first
+  await ensureDb();
   const db = getDb();
 
   try {

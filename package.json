@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:init": "tsx scripts/init-db.ts",
+    "db:migrate:parental": "tsx scripts/migrate-parental-guides.ts",
+    "fetch:imdb": "tsx scripts/fetch-imdb-parental-guides.ts",
     "setup": "npm run db:init",
     "test": "echo \"No tests configured yet\" && exit 0"
   },
