@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { searchEpisodes, getSeasons } from '@/lib/episodes';
+import { searchEpisodes, getSeasons, getUserParentalPreferences } from '@/lib/episodes';
 import { getCurrentUser } from '@/lib/auth';
 import { episodeFiltersSchema } from '@/lib/validations';
 import { ensureDb } from '@/lib/db';
@@ -19,7 +19,25 @@ export async function GET(request: Request) {
     }
 
     const user = await getCurrentUser();
-    const results = await searchEpisodes(parsed.data, user?.id);
+
+    // Auto-apply user's parental preferences if enabled
+    let filterParams = { ...parsed.data };
+    if (user) {
+      const prefs = await getUserParentalPreferences(user.id);
+      if (prefs && prefs.filter_enabled) {
+        // Apply user preferences (search filters override preferences)
+        filterParams = {
+          ...filterParams,
+          max_violence: filterParams.max_violence ?? prefs.max_violence,
+          max_sex: filterParams.max_sex ?? prefs.max_sex,
+          max_profanity: filterParams.max_profanity ?? prefs.max_profanity,
+          max_alcohol: filterParams.max_alcohol ?? prefs.max_alcohol,
+          max_frightening: filterParams.max_frightening ?? prefs.max_frightening,
+        };
+      }
+    }
+
+    const results = await searchEpisodes(filterParams, user?.id);
     const seasons = await getSeasons();
 
     return NextResponse.json({
