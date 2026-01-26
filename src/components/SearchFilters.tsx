@@ -18,6 +18,12 @@ export default function SearchFilters({ seasons }: SearchFiltersProps) {
   const [minRating, setMinRating] = useState(searchParams.get('min_rating') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sort_by') || 'episode');
   const [sortOrder, setSortOrder] = useState(searchParams.get('sort_order') || 'asc');
+  const [maxViolence, setMaxViolence] = useState(searchParams.get('max_violence') || '');
+  const [maxSex, setMaxSex] = useState(searchParams.get('max_sex') || '');
+  const [maxProfanity, setMaxProfanity] = useState(searchParams.get('max_profanity') || '');
+  const [maxAlcohol, setMaxAlcohol] = useState(searchParams.get('max_alcohol') || '');
+  const [maxFrightening, setMaxFrightening] = useState(searchParams.get('max_frightening') || '');
+  const [showParentalFilters, setShowParentalFilters] = useState(false);
 
   const [guestStarSuggestions, setGuestStarSuggestions] = useState<string[]>([]);
   const [settingSuggestions, setSettingSuggestions] = useState<string[]>([]);
@@ -34,9 +40,14 @@ export default function SearchFilters({ seasons }: SearchFiltersProps) {
     if (minRating) params.set('min_rating', minRating);
     if (sortBy !== 'episode') params.set('sort_by', sortBy);
     if (sortOrder !== 'asc') params.set('sort_order', sortOrder);
+    if (maxViolence) params.set('max_violence', maxViolence);
+    if (maxSex) params.set('max_sex', maxSex);
+    if (maxProfanity) params.set('max_profanity', maxProfanity);
+    if (maxAlcohol) params.set('max_alcohol', maxAlcohol);
+    if (maxFrightening) params.set('max_frightening', maxFrightening);
 
     router.push(`/?${params.toString()}`);
-  }, [search, season, guestStar, setting, minRating, sortBy, sortOrder, router]);
+  }, [search, season, guestStar, setting, minRating, sortBy, sortOrder, maxViolence, maxSex, maxProfanity, maxAlcohol, maxFrightening, router]);
 
   // Debounce the filter update
   useEffect(() => {
@@ -78,10 +89,16 @@ export default function SearchFilters({ seasons }: SearchFiltersProps) {
     setMinRating('');
     setSortBy('episode');
     setSortOrder('asc');
+    setMaxViolence('');
+    setMaxSex('');
+    setMaxProfanity('');
+    setMaxAlcohol('');
+    setMaxFrightening('');
+    setShowParentalFilters(false);
     router.push('/');
   };
 
-  const hasFilters = search || season || guestStar || setting || minRating || sortBy !== 'episode' || sortOrder !== 'asc';
+  const hasFilters = search || season || guestStar || setting || minRating || sortBy !== 'episode' || sortOrder !== 'asc' || maxViolence || maxSex || maxProfanity || maxAlcohol || maxFrightening;
 
   return (
     <div className="bg-slate-800 rounded-lg p-4 mb-6">
@@ -202,6 +219,52 @@ export default function SearchFilters({ seasons }: SearchFiltersProps) {
         </select>
       </div>
 
+      {/* Parental Guide Filters */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowParentalFilters(!showParentalFilters)}
+          className="text-slate-400 hover:text-white text-sm flex items-center gap-2"
+        >
+          <span>{showParentalFilters ? '▼' : '▶'}</span>
+          Content Filters (Parental Guide)
+        </button>
+
+        {showParentalFilters && (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-700 p-4 rounded">
+            <ParentalSlider
+              label="Violence"
+              icon="⚔️"
+              value={maxViolence}
+              onChange={setMaxViolence}
+            />
+            <ParentalSlider
+              label="Sexual"
+              icon="💋"
+              value={maxSex}
+              onChange={setMaxSex}
+            />
+            <ParentalSlider
+              label="Profanity"
+              icon="🤬"
+              value={maxProfanity}
+              onChange={setMaxProfanity}
+            />
+            <ParentalSlider
+              label="Drugs"
+              icon="🍺"
+              value={maxAlcohol}
+              onChange={setMaxAlcohol}
+            />
+            <ParentalSlider
+              label="Frightening"
+              icon="😨"
+              value={maxFrightening}
+              onChange={setMaxFrightening}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Clear filters */}
       {hasFilters && (
         <button
@@ -211,6 +274,35 @@ export default function SearchFilters({ seasons }: SearchFiltersProps) {
           Clear all filters
         </button>
       )}
+    </div>
+  );
+}
+
+interface ParentalSliderProps {
+  label: string;
+  icon: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function ParentalSlider({ label, icon, value, onChange }: ParentalSliderProps) {
+  return (
+    <div>
+      <label className="text-white text-sm mb-2 flex items-center gap-1">
+        <span>{icon}</span>
+        <span>{label}</span>
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-slate-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+      >
+        <option value="">Any</option>
+        <option value="0">None only</option>
+        <option value="1">Up to Mild</option>
+        <option value="2">Up to Moderate</option>
+        <option value="3">Up to Severe</option>
+      </select>
     </div>
   );
 }
