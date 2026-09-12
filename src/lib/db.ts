@@ -9,7 +9,7 @@ export function getDb(): Client {
   if (!client) {
     // For local development, use file: URL
     // For Turso cloud, use libsql:// or https:// URL
-    const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || 'file:./prisma/dev.db';
+    const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || 'file:./dev.db';
     const authToken = process.env.TURSO_AUTH_TOKEN;
 
     client = createClient({
@@ -27,6 +27,15 @@ export async function initDb(): Promise<void> {
 
   initPromise = (async () => {
     const db = getDb();
+
+    // SQLite leaves foreign keys off per connection, which would make every
+    // ON DELETE CASCADE below inert. Remote libsql rejects the pragma and
+    // enforces constraints server-side instead, hence the catch.
+    try {
+      await db.execute('PRAGMA foreign_keys = ON');
+    } catch {
+      // Enforced by the server for remote connections
+    }
 
     // Create tables
     await db.executeMultiple(`
@@ -105,7 +114,12 @@ export async function initDb(): Promise<void> {
     `);
 
     initialized = true;
-  })();
+  })().catch((error) => {
+    // Without this reset a single transient failure would be replayed to
+    // every later caller, since they all await this same cached promise.
+    initPromise = null;
+    throw error;
+  });
 
   return initPromise;
 }
@@ -119,9 +133,7 @@ export async function ensureDb(): Promise<void> {
   await initDb();
 }
 
-// Generate a CUID-like ID
+// Generate a unique ID
 export function generateId(): string {
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).substring(2, 10);
-  return `c${timestamp}${randomPart}`;
+  return crypto.randomUUID();
 }

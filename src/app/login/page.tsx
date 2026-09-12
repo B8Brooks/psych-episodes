@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, user } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,9 +15,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // Redirect if already logged in
-  if (user) {
-    router.push('/');
-    return null;
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/');
+    }
+  }, [authLoading, user, router]);
+
+  // Wait for the session check so an existing session doesn't flash the form
+  if (authLoading || user) {
+    return <p className="text-slate-400 text-center">Loading...</p>;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

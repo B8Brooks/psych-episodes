@@ -209,6 +209,8 @@ export default function EpisodeDetailPage({
               isBookmarked ? 'text-green-400' : 'text-slate-600 hover:text-green-400'
             }`}
             title={isBookmarked ? 'Remove from watchlist' : 'Add to watchlist'}
+            aria-label={isBookmarked ? 'Remove from watchlist' : 'Add to watchlist'}
+            aria-pressed={isBookmarked}
           >
             {isBookmarked ? '★' : '☆'}
           </button>

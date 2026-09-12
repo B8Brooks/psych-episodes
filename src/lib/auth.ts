@@ -4,9 +4,16 @@ import { cookies } from 'next/headers';
 import { getDb, generateId } from './db';
 import type { User, UserPublic, JWTPayload } from './types';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'development-secret-change-in-production'
-);
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET must be set in production');
+    }
+    return new TextEncoder().encode('development-secret-change-in-production');
+  }
+  return new TextEncoder().encode(secret);
+}
 
 const COOKIE_NAME = 'auth_token';
 const TOKEN_EXPIRY = '7d'; // 7 days
@@ -27,13 +34,16 @@ export async function createToken(userId: string, email: string): Promise<string
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(TOKEN_EXPIRY)
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 }
 
 // Verify a JWT token
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
+    if (typeof payload.userId !== 'string' || typeof payload.email !== 'string') {
+      return null;
+    }
     return payload as unknown as JWTPayload;
   } catch {
     return null;
@@ -89,11 +99,12 @@ export async function registerUser(
   name?: string
 ): Promise<{ success: true; user: UserPublic } | { success: false; error: string }> {
   const db = getDb();
+  const normalizedEmail = email.trim().toLowerCase();
 
   // Check if email already exists
   const existingResult = await db.execute({
     sql: 'SELECT id FROM users WHERE email = ?',
-    args: [email],
+    args: [normalizedEmail],
   });
 
   if (existingResult.rows.length > 0) {
@@ -111,14 +122,19 @@ export async function registerUser(
         INSERT INTO users (id, email, password_hash, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `,
-      args: [id, email, passwordHash, name || null, now, now],
+      args: [id, normalizedEmail, passwordHash, name || null, now, now],
     });
 
     return {
       success: true,
-      user: { id, email, name: name || null, created_at: now },
+      user: { id, email: normalizedEmail, name: name || null, created_at: now },
     };
   } catch (error) {
+    // Two concurrent registrations can both clear the check above; the
+    // UNIQUE constraint is what actually decides the winner.
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      return { success: false, error: 'Email already registered' };
+    }
     console.error('Registration error:', error);
     return { success: false, error: 'Failed to create user' };
   }
@@ -137,7 +153,7 @@ export async function loginUser(
       FROM users
       WHERE email = ?
     `,
-    args: [email],
+    args: [email.trim().toLowerCase()],
   });
 
   if (result.rows.length === 0) {

@@ -14,7 +14,7 @@ export default function EpisodeCard({ episode }: EpisodeCardProps) {
   return (
     <Link
       href={`/episode/${episode.id}`}
-      className="block bg-slate-800 rounded-lg p-4 hover:bg-slate-750 transition border border-slate-700 hover:border-slate-600"
+      className="block bg-slate-800 rounded-lg p-4 hover:bg-slate-700 transition border border-slate-700 hover:border-slate-600"
     >
       <div className="flex justify-between items-start mb-2">
         <span className="text-slate-500 text-sm font-mono">

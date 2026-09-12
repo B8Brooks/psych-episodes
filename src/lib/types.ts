@@ -1,4 +1,4 @@
-// Database types for Murder, She Wrote app
+// Database types for the Psych app
 
 export interface Episode {
   id: string;
