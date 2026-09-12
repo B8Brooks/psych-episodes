@@ -45,7 +45,12 @@ TURSO_DATABASE_URL=your_turso_database_url
 TURSO_AUTH_TOKEN=your_turso_auth_token
 JWT_SECRET=your_jwt_secret_key
 TMDB_API_KEY=your_tmdb_api_key
+ADMIN_SECRET=your_admin_secret
 ```
+
+`JWT_SECRET` is required in production — the app refuses to start without it
+rather than falling back to a default. `ADMIN_SECRET` gates the database
+seeding endpoint; choose your own value and keep it out of source control.
 
 ### Installation
 
@@ -79,8 +84,8 @@ npm run dev
 After deployment, visit the admin page to seed the database with episode data:
 
 1. Navigate to `/admin` on your deployed site
-2. Enter the admin secret: `ive-heard-it-both-ways`
-3. Click "Seed Database" to fetch and store all episodes from TMDB
+2. Enter the value you set for `ADMIN_SECRET`
+3. Click "Fetch from TMDB" to fetch and store all episodes
 
 ## Deployment
 
@@ -93,6 +98,7 @@ After deployment, visit the admin page to seed the database with episode data:
    - `TURSO_AUTH_TOKEN`
    - `JWT_SECRET`
    - `TMDB_API_KEY`
+   - `ADMIN_SECRET`
 4. Deploy
 5. Visit `/admin` to seed the database
 
@@ -117,7 +123,7 @@ psych-episodes/
 - `GET /api/episodes` - Get all episodes with filters
 - `POST /api/episodes/[id]/rate` - Rate an episode
 - `POST /api/episodes/[id]/bookmark` - Bookmark an episode
-- `POST /api/admin/seed` - Seed database (requires admin secret)
+- `POST /api/admin/fetch-tmdb` - Seed database from TMDB (requires the `x-admin-secret` header)
 
 ## Color Scheme
 
@@ -125,7 +131,9 @@ The app uses a green color theme to differentiate it from the amber-themed Murde
 
 ## Admin Secret
 
-Admin operations require the secret phrase: **ive-heard-it-both-ways** (a classic Psych reference!)
+Admin operations require the value of the `ADMIN_SECRET` environment variable,
+sent as an `x-admin-secret` header. Set it to whatever you like — a classic
+Psych reference such as "I've heard it both ways" makes a fine passphrase.
 
 ## License
 

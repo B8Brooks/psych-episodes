@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { bookmarkEpisode, getUserBookmarks } from '@/lib/user-actions';
+import { bookmarkEpisode, getUserBookmarks, isMissingEpisodeError } from '@/lib/user-actions';
 import { ensureDb } from '@/lib/db';
+import { parsePagination } from '@/lib/validations';
 
 // Get all bookmarks for current user
 export async function GET(request: Request) {
@@ -13,10 +14,9 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const { limit, offset } = parsePagination(searchParams, { defaultLimit: 50, maxLimit: 100 });
 
-    const result = await getUserBookmarks(user.id, Math.min(limit, 100), offset);
+    const result = await getUserBookmarks(user.id, limit, offset);
 
     return NextResponse.json(result);
   } catch (error) {
@@ -43,8 +43,12 @@ export async function POST(request: Request) {
 
     const bookmark = await bookmarkEpisode(user.id, episode_id);
 
-    return NextResponse.json({ bookmark }, { status: 201 });
+    // Idempotent upsert, so this is not necessarily a creation.
+    return NextResponse.json({ bookmark });
   } catch (error) {
+    if (isMissingEpisodeError(error)) {
+      return NextResponse.json({ error: 'Episode not found' }, { status: 404 });
+    }
     console.error('Create bookmark error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

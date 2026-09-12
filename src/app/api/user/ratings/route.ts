@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { rateEpisode, getUserRatings } from '@/lib/user-actions';
-import { ratingSchema } from '@/lib/validations';
+import { rateEpisode, getUserRatings, isMissingEpisodeError } from '@/lib/user-actions';
+import { ratingSchema, parsePagination } from '@/lib/validations';
 import { ensureDb } from '@/lib/db';
 
 // Get all ratings for current user
@@ -14,10 +14,9 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const { limit, offset } = parsePagination(searchParams, { defaultLimit: 50, maxLimit: 100 });
 
-    const result = await getUserRatings(user.id, Math.min(limit, 100), offset);
+    const result = await getUserRatings(user.id, limit, offset);
 
     return NextResponse.json(result);
   } catch (error) {
@@ -52,8 +51,12 @@ export async function POST(request: Request) {
 
     const rating = await rateEpisode(user.id, episode_id, parsed.data.rating, parsed.data.notes);
 
-    return NextResponse.json({ rating }, { status: 201 });
+    // Idempotent upsert, so this is not necessarily a creation.
+    return NextResponse.json({ rating });
   } catch (error) {
+    if (isMissingEpisodeError(error)) {
+      return NextResponse.json({ error: 'Episode not found' }, { status: 404 });
+    }
     console.error('Create rating error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

@@ -43,9 +43,42 @@ export default function StarRating({
     setHoverRating(isHalf ? starIndex + 0.5 : starIndex + 1);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!interactive || !onChange) return;
+    const step = e.shiftKey ? 0.5 : 1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      onChange(Math.min(rating + step, maxRating));
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      onChange(Math.max(rating - step, 0.5));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      onChange(0.5);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      onChange(maxRating);
+    }
+  };
+
   return (
     <div className="flex items-center gap-1">
-      <div className="flex">
+      <div
+        className="flex"
+        {...(interactive
+          ? {
+              role: 'slider',
+              tabIndex: 0,
+              'aria-label': 'Your rating',
+              'aria-valuemin': 0.5,
+              'aria-valuemax': maxRating,
+              'aria-valuenow': rating,
+              'aria-valuetext': `${rating} out of ${maxRating} stars`,
+              onKeyDown: handleKeyDown,
+              onBlur: () => setHoverRating(null),
+            }
+          : { role: 'img', 'aria-label': `${rating.toFixed(1)} out of ${maxRating} stars` })}
+      >
         {[...Array(maxRating)].map((_, i) => {
           const fillLevel = Math.min(Math.max(displayRating - i, 0), 1);
           const isFull = fillLevel >= 1;
@@ -68,6 +101,7 @@ export default function StarRating({
                 className={`absolute inset-0 ${sizeClasses[size]} text-slate-600`}
                 fill="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
@@ -78,6 +112,7 @@ export default function StarRating({
                   className={`absolute inset-0 ${sizeClasses[size]} text-green-400`}
                   fill="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                   style={isHalf ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
                 >
                   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />

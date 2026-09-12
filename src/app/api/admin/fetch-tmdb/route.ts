@@ -1,6 +1,14 @@
+import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { ensureDb } from '@/lib/db';
 import { importEpisodes } from '@/lib/episodes';
+
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  // timingSafeEqual throws unless both buffers are the same length.
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 const TMDB_SHOW_ID = 1447; // Psych
 const TOTAL_SEASONS = 8;
@@ -81,10 +89,16 @@ function detectSetting(synopsis: string, title: string): string {
 
 export async function POST(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const secret = searchParams.get('secret');
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      return NextResponse.json(
+        { error: 'ADMIN_SECRET is not configured on the server' },
+        { status: 503 }
+      );
+    }
 
-    if (secret !== 'ive-heard-it-both-ways') {
+    const secret = request.headers.get('x-admin-secret');
+    if (!secret || !secretsMatch(secret, adminSecret)) {
       return NextResponse.json({ error: 'Invalid secret' }, { status: 401 });
     }
 

@@ -2,13 +2,13 @@ import { z } from 'zod';
 
 // Auth validations
 export const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().trim().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(1, 'Name is required').optional(),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().trim().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -24,6 +24,25 @@ export const episodeFiltersSchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
 });
+
+// Shared limit/offset parsing for the simple list endpoints.
+// `parseInt` alone yields NaN for junk input, which SQLite then receives as a
+// LIMIT value, so clamp to a finite non-negative range here.
+export function parsePagination(
+  searchParams: URLSearchParams,
+  { defaultLimit, maxLimit }: { defaultLimit: number; maxLimit: number }
+): { limit: number; offset: number } {
+  const clamp = (raw: string | null, fallback: number, min: number, max: number) => {
+    const parsed = Number(raw);
+    if (raw === null || raw.trim() === '' || !Number.isFinite(parsed)) return fallback;
+    return Math.min(Math.max(Math.trunc(parsed), min), max);
+  };
+
+  return {
+    limit: clamp(searchParams.get('limit'), defaultLimit, 1, maxLimit),
+    offset: clamp(searchParams.get('offset'), 0, 0, Number.MAX_SAFE_INTEGER),
+  };
+}
 
 // Rating validations
 export const ratingSchema = z.object({

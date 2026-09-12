@@ -7,6 +7,12 @@ import type {
   UserStats,
 } from './types';
 
+// Foreign keys are enforced (see initDb), so referencing a missing episode
+// surfaces as a constraint error rather than an orphaned row.
+export function isMissingEpisodeError(error: unknown): boolean {
+  return error instanceof Error && /FOREIGN KEY/i.test(error.message);
+}
+
 // Rate an episode (create or update)
 export async function rateEpisode(
   userId: string,
@@ -23,42 +29,25 @@ export async function rateEpisode(
 
   const now = new Date().toISOString();
 
-  // Check for existing rating
-  const existingResult = await db.execute({
-    sql: 'SELECT id FROM ratings WHERE user_id = ? AND episode_id = ?',
-    args: [userId, episodeId],
+  // Upsert so concurrent rates of the same episode can't collide on the
+  // UNIQUE(user_id, episode_id) constraint.
+  await db.execute({
+    sql: `
+      INSERT INTO ratings (id, user_id, episode_id, rating, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, episode_id) DO UPDATE SET
+        rating = excluded.rating,
+        notes = excluded.notes,
+        updated_at = excluded.updated_at
+    `,
+    args: [generateId(), userId, episodeId, rating, notes || null, now, now],
   });
 
-  if (existingResult.rows.length > 0) {
-    // Update existing rating
-    const existingId = existingResult.rows[0].id as string;
-    await db.execute({
-      sql: 'UPDATE ratings SET rating = ?, notes = ?, updated_at = ? WHERE id = ?',
-      args: [rating, notes || null, now, existingId],
-    });
-
-    const result = await db.execute({
-      sql: 'SELECT * FROM ratings WHERE id = ?',
-      args: [existingId],
-    });
-    return result.rows[0] as unknown as Rating;
-  } else {
-    // Create new rating
-    const id = generateId();
-    await db.execute({
-      sql: `
-        INSERT INTO ratings (id, user_id, episode_id, rating, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
-      args: [id, userId, episodeId, rating, notes || null, now, now],
-    });
-
-    const result = await db.execute({
-      sql: 'SELECT * FROM ratings WHERE id = ?',
-      args: [id],
-    });
-    return result.rows[0] as unknown as Rating;
-  }
+  const result = await db.execute({
+    sql: 'SELECT * FROM ratings WHERE user_id = ? AND episode_id = ?',
+    args: [userId, episodeId],
+  });
+  return result.rows[0] as unknown as Rating;
 }
 
 // Remove a rating
@@ -148,28 +137,22 @@ export async function getUserRatings(
 // Bookmark an episode
 export async function bookmarkEpisode(userId: string, episodeId: string): Promise<Bookmark> {
   const db = getDb();
-
-  // Check for existing bookmark
-  const existingResult = await db.execute({
-    sql: 'SELECT * FROM bookmarks WHERE user_id = ? AND episode_id = ?',
-    args: [userId, episodeId],
-  });
-
-  if (existingResult.rows.length > 0) {
-    return existingResult.rows[0] as unknown as Bookmark;
-  }
-
-  const id = generateId();
   const now = new Date().toISOString();
 
+  // Bookmarking is idempotent; let the UNIQUE constraint absorb duplicates
+  // rather than racing a check-then-insert.
   await db.execute({
-    sql: 'INSERT INTO bookmarks (id, user_id, episode_id, created_at) VALUES (?, ?, ?, ?)',
-    args: [id, userId, episodeId, now],
+    sql: `
+      INSERT INTO bookmarks (id, user_id, episode_id, created_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, episode_id) DO NOTHING
+    `,
+    args: [generateId(), userId, episodeId, now],
   });
 
   const result = await db.execute({
-    sql: 'SELECT * FROM bookmarks WHERE id = ?',
-    args: [id],
+    sql: 'SELECT * FROM bookmarks WHERE user_id = ? AND episode_id = ?',
+    args: [userId, episodeId],
   });
   return result.rows[0] as unknown as Bookmark;
 }
